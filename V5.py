@@ -1,7 +1,3 @@
-# On-robot PID tuner for 3pi+ 2040 (extended)
-#
-
-
 from pololu_3pi_2040_robot import robot
 from pololu_3pi_2040_robot.extras import editions
 import time
