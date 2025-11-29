@@ -1,5 +1,3 @@
-
-
 from pololu_3pi_2040_robot import robot
 from pololu_3pi_2040_robot.extras import editions
 import time
@@ -122,7 +120,6 @@ def main():
     global last_a_ms, last_b_ms, last_c_ms
 
     calibrate()
-
     last_p = 0
     p = 0
     last_l = 2000  
