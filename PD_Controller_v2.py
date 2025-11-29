@@ -1,0 +1,310 @@
+from pololu_3pi_2040_robot import robot
+from pololu_3pi_2040_robot.extras import editions
+import time
+
+display = robot.Display()
+motors = robot.Motors()
+line_sensors = robot.LineSensors()
+bump_sensors = robot.BumpSensors()
+
+button_a = robot.ButtonA()
+button_b = robot.ButtonB()
+button_c = robot.ButtonC()
+
+edition = editions.select()
+if edition == "Standard":
+    max_speed = 6000
+    calibration_speed = 1000
+    calibration_count = 100
+elif edition == "Turtle":
+    max_speed = 6000
+    calibration_speed = 3000
+    calibration_count = 100
+elif edition == "Hyper":
+    max_speed = 2000
+    calibration_speed = 1000
+    calibration_count = 100
+    motors.flip_left(True)
+    motors.flip_right(True)
+
+Kp_line = 3.0
+Kd_line = 30.0
+BASE_MAX_line = 2700
+
+Kp_between = 1.0
+Kd_between = 10.0
+BASE_MAX_between = 2200
+
+KP_STEP = 0.1
+KD_STEP = 0.5
+
+selected_param = 0
+
+DEBOUNCE_MS = 200
+last_a_ms = 0
+last_b_ms = 0
+last_c_ms = 0
+
+LINE_TOTAL_MIN = 200
+
+P_FULL_ERROR = 1200
+BASE_MIN_FRACTION = 0.2
+
+MODE_WAIT = 0
+MODE_LINE = 1
+MODE_BETWEEN = 2
+
+mode = MODE_WAIT
+bump_was_pressed = False
+
+last_loop_ms = 0
+dt_nom_ms = 6.0
+
+
+def calibrate():
+    display.fill(0)
+    display.text("Calibrating", 0, 0)
+    display.show()
+
+    motors.set_speeds(calibration_speed, -calibration_speed)
+    for _ in range(calibration_count // 4):
+        line_sensors.calibrate()
+        time.sleep_ms(10)
+
+    motors.off()
+    time.sleep_ms(200)
+
+    motors.set_speeds(-calibration_speed, calibration_speed)
+    for _ in range(calibration_count // 2):
+        line_sensors.calibrate()
+        time.sleep_ms(10)
+
+    motors.off()
+    time.sleep_ms(200)
+
+    motors.set_speeds(calibration_speed, -calibration_speed)
+    for _ in range(calibration_count // 4):
+        line_sensors.calibrate()
+        time.sleep_ms(10)
+
+    motors.off()
+    time.sleep_ms(200)
+
+    display.fill(0)
+    display.text("Cal Bump", 0, 0)
+    display.show()
+    bump_sensors.calibrate()
+    time.sleep_ms(300)
+
+    display.fill(0)
+    display.text("PID Modes", 0, 0)
+    display.text("1:LINE 2:BETW", 0, 10)
+    display.show()
+    time.sleep_ms(500)
+
+
+def update_display(p, Kp_line, Kd_line, Kp_between, Kd_between, selected_param, mode):
+    display.fill(0)
+
+    if mode == MODE_WAIT:
+        state = "WAIT 1st bump"
+    elif mode == MODE_LINE:
+        state = "MODE: LINE"
+    else:
+        state = "MODE: BETWEEN"
+
+    display.text(state, 0, 0)
+    display.text("A:Sel B:- C:+", 0, 10)
+
+    if selected_param == 0:
+        pl = ">"
+        pdl = " "
+        pb = " "
+        pdb = " "
+    elif selected_param == 1:
+        pl = " "
+        pdl = ">"
+        pb = " "
+        pdb = " "
+    elif selected_param == 2:
+        pl = " "
+        pdl = " "
+        pb = ">"
+        pdb = " "
+    else:
+        pl = " "
+        pdl = " "
+        pb = " "
+        pdb = ">"
+
+    display.text("{}KpL:{:.2f}".format(pl, Kp_line), 0, 22)
+    display.text("{}KdL:{:.2f}".format(pdl, Kd_line), 0, 32)
+    display.text("{}KpB:{:.2f}".format(pb, Kp_between), 0, 42)
+    display.text("{}KdB:{:.2f}".format(pdb, Kd_between), 0, 52)
+
+    display.show()
+
+
+def main():
+    global Kp_line, Kd_line, Kp_between, Kd_between
+    global selected_param
+    global last_a_ms, last_b_ms, last_c_ms
+    global mode, bump_was_pressed
+    global last_loop_ms, dt_nom_ms
+
+    calibrate()
+    time.sleep_ms(500)
+
+    last_p = 0
+    p = 0
+    last_l = 2000
+
+    last_loop_ms = time.ticks_ms()
+
+    line_sensors.start_read()
+
+    while True:
+        now_ms = time.ticks_ms()
+        dt_ms = time.ticks_diff(now_ms, last_loop_ms)
+        if dt_ms <= 0:
+            dt_ms = 1
+        last_loop_ms = now_ms
+
+        dt_nom_ms = 0.99 * dt_nom_ms + 0.01 * dt_ms
+
+        bump_sensors.read()
+        left_pressed = bump_sensors.left_is_pressed()
+        right_pressed = bump_sensors.right_is_pressed()
+        any_pressed = left_pressed or right_pressed
+
+        if any_pressed and not bump_was_pressed:
+            if mode == MODE_WAIT:
+                mode = MODE_LINE
+                last_p = 0
+                p = 0
+                last_l = 2000
+            elif mode == MODE_LINE:
+                mode = MODE_BETWEEN
+                last_p = 0
+                p = 0
+        bump_was_pressed = any_pressed
+
+        line = line_sensors.read_calibrated()
+        line_sensors.start_read()
+
+        total = line[0] + line[1] + line[2] + line[3] + line[4]
+
+        if total > LINE_TOTAL_MIN:
+            weighted_sum = (
+                0 * line[0]
+                + 1000 * line[1]
+                + 2000 * line[2]
+                + 3000 * line[3]
+                + 4000 * line[4]
+            )
+            l = weighted_sum // total
+            last_l = l
+        else:
+            l = last_l
+
+        if mode == MODE_LINE:
+            p_raw = l - 2000
+            Kp_use = Kp_line
+            Kd_use = Kd_line
+            BASE_MAX_use = BASE_MAX_line
+        elif mode == MODE_BETWEEN:
+            left_sum = line[0] + line[1]
+            right_sum = line[3] + line[4]
+            p_raw = right_sum - left_sum
+            Kp_use = Kp_between
+            Kd_use = Kd_between
+            BASE_MAX_use = BASE_MAX_between
+        else:
+            p_raw = 0
+            Kp_use = 0.0
+            Kd_use = 0.0
+            BASE_MAX_use = 0
+
+        if mode in (MODE_LINE, MODE_BETWEEN):
+            p = p_raw
+            d_raw = p - last_p
+            last_p = p
+            d_scaled = d_raw * (dt_nom_ms / dt_ms)
+        else:
+            p = 0
+            last_p = 0
+            d_scaled = 0
+
+        base_min = int(BASE_MAX_use * BASE_MIN_FRACTION)
+        if base_min < 0:
+            base_min = 0
+        if base_min > BASE_MAX_use:
+            base_min = BASE_MAX_use
+
+        abs_p = abs(p)
+        if abs_p >= P_FULL_ERROR:
+            base = base_min
+        else:
+            base = BASE_MAX_use - (BASE_MAX_use - base_min) * abs_p / P_FULL_ERROR
+            base = int(base)
+
+        turn = Kp_use * p + Kd_use * d_scaled
+
+        if turn > base:
+            turn = base
+        elif turn < -base:
+            turn = -base
+
+        left_speed = base + int(turn)
+        right_speed = base - int(turn)
+
+        if left_speed < 0:
+            left_speed = 0
+        if left_speed > max_speed:
+            left_speed = max_speed
+        if right_speed < 0:
+            right_speed = 0
+        if right_speed > max_speed:
+            right_speed = max_speed
+
+        if mode in (MODE_LINE, MODE_BETWEEN):
+            motors.set_speeds(left_speed, right_speed)
+        else:
+            motors.off()
+
+        if button_a.check():
+            if time.ticks_diff(now_ms, last_a_ms) > DEBOUNCE_MS:
+                selected_param = (selected_param + 1) % 4
+                last_a_ms = now_ms
+
+        if button_b.check():
+            if time.ticks_diff(now_ms, last_b_ms) > DEBOUNCE_MS:
+                if selected_param == 0:
+                    Kp_line = max(0.0, Kp_line - KP_STEP)
+                elif selected_param == 1:
+                    Kd_line = max(0.0, Kd_line - KD_STEP)
+                elif selected_param == 2:
+                    Kp_between = max(0.0, Kp_between - KP_STEP)
+                else:
+                    Kd_between = max(0.0, Kd_between - KD_STEP)
+                last_b_ms = now_ms
+
+        if button_c.check():
+            if time.ticks_diff(now_ms, last_c_ms) > DEBOUNCE_MS:
+                if selected_param == 0:
+                    Kp_line += KP_STEP
+                elif selected_param == 1:
+                    Kd_line += KD_STEP
+                elif selected_param == 2:
+                    Kp_between += KP_STEP
+                else:
+                    Kd_between += KD_STEP
+                last_c_ms = now_ms
+
+        if (now_ms % 100) < 10:
+            update_display(p, Kp_line, Kd_line, Kp_between, Kd_between, selected_param, mode)
+
+        time.sleep_ms(5)
+
+
+main()
