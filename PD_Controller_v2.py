@@ -33,7 +33,7 @@ BASE_MAX_line = 2700
 
 Kp_between = 1.0
 Kd_between = 10.0
-BASE_MAX_between = 2200
+BASE_MAX_between = 2300
 
 KP_STEP = 0.1
 KD_STEP = 0.5
@@ -63,14 +63,13 @@ dt_nom_ms = 6.0
 
 def calibrate():
     display.fill(0)
-    display.text("Calibrating", 0, 0)
+    display.text("Cal Line", 0, 0)
     display.show()
 
     motors.set_speeds(calibration_speed, -calibration_speed)
     for _ in range(calibration_count // 4):
         line_sensors.calibrate()
         time.sleep_ms(10)
-
     motors.off()
     time.sleep_ms(200)
 
@@ -78,7 +77,6 @@ def calibrate():
     for _ in range(calibration_count // 2):
         line_sensors.calibrate()
         time.sleep_ms(10)
-
     motors.off()
     time.sleep_ms(200)
 
@@ -86,7 +84,6 @@ def calibrate():
     for _ in range(calibration_count // 4):
         line_sensors.calibrate()
         time.sleep_ms(10)
-
     motors.off()
     time.sleep_ms(200)
 
@@ -97,7 +94,7 @@ def calibrate():
     time.sleep_ms(300)
 
     display.fill(0)
-    display.text("PID Modes", 0, 0)
+    display.text("A:Sel B:- C:+", 0, 0)
     display.text("1:LINE 2:BETW", 0, 10)
     display.show()
     time.sleep_ms(500)
@@ -105,14 +102,12 @@ def calibrate():
 
 def update_display(p, Kp_line, Kd_line, Kp_between, Kd_between, selected_param, mode):
     display.fill(0)
-
     if mode == MODE_WAIT:
         state = "WAIT 1st bump"
     elif mode == MODE_LINE:
         state = "MODE: LINE"
     else:
         state = "MODE: BETWEEN"
-
     display.text(state, 0, 0)
     display.text("A:Sel B:- C:+", 0, 10)
 
@@ -141,7 +136,6 @@ def update_display(p, Kp_line, Kd_line, Kp_between, Kd_between, selected_param, 
     display.text("{}KdL:{:.2f}".format(pdl, Kd_line), 0, 32)
     display.text("{}KpB:{:.2f}".format(pb, Kp_between), 0, 42)
     display.text("{}KdB:{:.2f}".format(pdb, Kd_between), 0, 52)
-
     display.show()
 
 
@@ -160,7 +154,6 @@ def main():
     last_l = 2000
 
     last_loop_ms = time.ticks_ms()
-
     line_sensors.start_read()
 
     while True:
@@ -213,9 +206,9 @@ def main():
             Kd_use = Kd_line
             BASE_MAX_use = BASE_MAX_line
         elif mode == MODE_BETWEEN:
-            left_sum = line[0] + line[1]
-            right_sum = line[3] + line[4]
-            p_raw = right_sum - left_sum
+            left_intensity = line[0] + line[1]
+            right_intensity = line[3] + line[4]
+            p_raw = left_intensity - right_intensity
             Kp_use = Kp_between
             Kd_use = Kd_between
             BASE_MAX_use = BASE_MAX_between
