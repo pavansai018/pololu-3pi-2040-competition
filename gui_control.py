@@ -32,7 +32,7 @@ writer.writerow([
 root = tk.Tk()
 root.title("3pi+ 2040 USB Control")
 
-speed_var = tk.DoubleVar(value=0.6)
+speed_var = tk.DoubleVar(value=0.9)
 mode_var = tk.StringVar(value="STOP")
 last_log_label = tk.StringVar(value="Last LOG: (none)")
 speed_label_text = tk.StringVar(value="Base speed: 0")
