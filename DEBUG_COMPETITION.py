@@ -72,7 +72,7 @@ dt_nom_ms = 6.0
 # - MODE_LINE: "mostly white" -> low total
 # - MODE_BETWEEN: "mostly black" -> high total
 CORNER_WHITE_THR = 800      # tune via UI (MODE_LINE)
-CORNER_TOTAL_THR = 3500     # you said you reduced this (MODE_BETWEEN)
+CORNER_TOTAL_THR = 3100     # you said you reduced this (MODE_BETWEEN)
 CORNER_COOLDOWN_MS = 600
 
 between_turn_ms_remaining = 0
@@ -189,7 +189,7 @@ def update_display(p, selected_param, mode):
     display.show()
 
 
-# ---------- Gyro helpers ----------
+
 
 def gyro_reset_angle():
     global robot_angle, last_time_gyro_reading
@@ -256,7 +256,7 @@ def handle_between_corner(now_ms):
     Pattern:
       - Second bump already did a -90° (right) when entering MODE_BETWEEN.
       - Here, in MODE_BETWEEN:
-          Corner 1–5: +90° (left) turns
+          Corner 1-5: +90° (left) turns
           Corner 7:   stop robot
 
     Extra guard:
@@ -285,7 +285,7 @@ def handle_between_corner(now_ms):
         corner_count = 0  # reset logical cycle count
 
 
-# ---------- Main loop ----------
+
 
 def main():
     global selected_param
@@ -320,7 +320,6 @@ def main():
         right_pressed = bump_sensors.right_is_pressed()
         any_pressed = left_pressed or right_pressed
 
-        # Handle bump presses for mode switching
         if any_pressed and not bump_was_pressed:
             if mode == MODE_WAIT:
                 # First bump -> go to LINE mode
