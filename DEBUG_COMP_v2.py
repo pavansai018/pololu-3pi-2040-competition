@@ -24,7 +24,20 @@ rgb_leds = robot.RGBLEDs()
 rgb_leds.set_brightness(5)
 
 
-SONG = "t118 l8 o4 g a+ a+ a+ a+ g f d f g g a+ a+ a+ g f d f g a+ a+ a+ >c a+ g f d f g a+ a+ a+ g f d <b a g f d"
+# SONG = "t118 l8 o4 g a+ a+ a+ a+ g f d f g g a+ a+ a+ g f d f g a+ a+ a+ >c a+ g f d f g a+ a+ a+ g f d <b a g f d"
+SONG = """
+t220 l8
+e g a4 a r a b o5 c4 c r c d o4 b4 b r a g a4 r e g a4 a r a b
+o5 c4 c r c d o4 b4 b r a g a4 r e g a4 a r a o5 c d4 d r d e f4 f r
+e d e o4 a4 r a b o5 c4 c r d4 e o4 a4 r a o5 c o4 b4 b r o5 c o4 a b4
+r4 a4 a a b o5 c4 c r c d o4 b4 b r a g a4 r e g a4 a r a b o5 c4 c r
+c d o4 b4 b r a g a4 r e g a4 a r a o5 c d4 d r d e f4 f r e d e o4 a4
+r a b o5 c4 c r d4 e o4 a4 r a o5 c o4 b4 b r o5 c o4 a b4 r4 o5 e4
+r r4 f4 r r4 e e r g r e d r r4 d4 r r4 c4 r r4 o4 b o5 c r o4 b r a2
+o5 e4 r r4 f4 r r4 e e r g r e d r r4 d4 r r4 c4 r r4 o4 b o5 c r o4 b
+r a2
+"""
+
 
 edition = editions.select()
 if edition == "Standard":
@@ -118,7 +131,7 @@ line_corner_count = 0
 between_corner_count = 0    
 
 music_on = False
-
+SONG_START_MS = 0
 
 def calibrate():
     display.fill(0)
@@ -198,29 +211,90 @@ def update_display(p, selected_param, mode):
 
 
 
-def update_leds(time_ms, mode):
-    """
-    Smooth rainbow:
-      - MODE_LINE / MODE_BETWEEN: bright, fast
-      - MODE_WAIT: dimmer
-    """
-    hue_start = time_ms // 8
-    hue_step = 60
+# def update_leds(time_ms, mode):
+#     """
+#     Smooth rainbow:
+#       - MODE_LINE / MODE_BETWEEN: bright, fast
+#       - MODE_WAIT: dimmer
+#     """
+#     hue_start = time_ms // 8
+#     hue_step = 60
 
     
+#     s = 230 + round(25 * math.cos(time_ms / 3000))
+
+#     if mode in (MODE_LINE, MODE_BETWEEN):
+#         v = 255  
+#     else:
+#         v = 80    
+
+#     for led in range(6):
+#         r, g, b = rgb_leds.hsv2rgb(hue_start + hue_step * led, s, v)
+#         rgb_leds.set(led, [r, g // 3, b])  
+
+#     rgb_leds.show()
+
+def update_leds(time_ms, mode):
+    """
+    Pirates of the Caribbean – LED sync
+      - Uses song tempo t220, l8
+      - MODE_LINE / MODE_BETWEEN: bright, more aggressive
+      - MODE_WAIT: dimmer, softer
+    """
+
+    # --- timing relative to song start ---
+    # SONG_START_MS must be set when you start playing SONG.
+    global SONG_START_MS
+    t = time_ms - SONG_START_MS  # ms since song started
+    if t < 0:
+        t = 0
+
+    # Song tempo t220, default length l8
+    quarter_ms = 60000 / 220.0           # ≈ 272.7 ms
+    eighth_ms = quarter_ms / 2.0         # ≈ 136.3 ms
+
+    # Rough "note index" – one step per eighth note
+    note_index = int(t // eighth_ms)
+
+    # Phase within current 1/8th beat (0.0–1.0)
+    beat_phase = (t % eighth_ms) / eighth_ms
+
+    # --- brightness (flash on note onset, fade within beat) ---
+    if mode in (MODE_LINE, MODE_BETWEEN):
+        max_v = 255
+        min_v = 80
+    else:
+        max_v = 120
+        min_v = 40
+
+    # Flashy: bright at start of beat, decays over the 1/8th
+    v = int(max_v - (max_v - min_v) * beat_phase * 0.9)
+
+    # --- color / rainbow movement ---
+    # Move hue with note_index instead of raw time to tie it to music.
+    hue_start = (note_index * 18) % 360   # 18° per "note"
+    hue_step = 50                         # spacing between LEDs
+
+    # Slight saturation breathing (still keeps your cosine idea)
     s = 230 + round(25 * math.cos(time_ms / 3000))
 
-    if mode in (MODE_LINE, MODE_BETWEEN):
-        v = 255  
-    else:
-        v = 80    
-
+    # --- per-LED pattern: head + trail around the ring ---
     for led in range(6):
-        r, g, b = rgb_leds.hsv2rgb(hue_start + hue_step * led, s, v)
-        rgb_leds.set(led, [r, g // 3, b])  
+        # Distance from a "head" LED rotating with the music
+        head = note_index % 6
+        d = (led - head) % 6
+
+        # Trail gets dimmer as it moves away from head
+        trail_factor = max(0.3, 1.0 - 0.25 * d)
+        v_led = int(v * trail_factor)
+
+        hue = hue_start + hue_step * led
+        r, g, b = rgb_leds.hsv2rgb(hue, s, v_led)
+
+        # keep your original green reduction
+        rgb_leds.set(led, [r, g // 3, b])
 
     rgb_leds.show()
-
 
 
 
@@ -311,7 +385,7 @@ def main():
     global between_turn_ms_remaining, between_turn_dir, last_corner_ms
     global corner_count, line_corner_count, between_corner_count
     global CORNER_WHITE_THR, CORNER_TOTAL_THR
-    global music_on
+    global music_on, SONG_START_MS
 
     calibrate()
     time.sleep_ms(500)
@@ -369,6 +443,7 @@ def main():
         if mode in (MODE_LINE, MODE_BETWEEN):
             if not music_on:
                 buzzer.play_in_background(SONG)
+                SONG_START_MS = time.ticks_ms() 
                 music_on = True
             else:
                 if not buzzer.is_playing():
