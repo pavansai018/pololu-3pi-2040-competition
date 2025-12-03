@@ -33,9 +33,9 @@ elif edition == "Hyper":
     motors.flip_right(True)
 
 # Line-following PD (black line)
-Kp_line = 3.0
-Kd_line = 30.0
-BASE_MAX_line = 2700
+Kp_line = 2.0
+Kd_line = 20.0
+BASE_MAX_line = 2300
 
 # Between-lines PD (white corridor)
 Kp_between = 2.0
@@ -377,7 +377,7 @@ def main():
                 motors.off()
                 time.sleep_ms(50)
                 line_corner_count += 1
-                print("Line corner #", line_corner_count)
+                # print("Line corner #", line_corner_count)
                 gyro_turn_relative(-90.0)  # all right turns in MODE_LINE
                 last_corner_ms = now_ms
                 # After turn, reset controller memory
