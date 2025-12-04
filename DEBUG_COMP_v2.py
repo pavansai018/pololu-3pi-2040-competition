@@ -92,7 +92,7 @@ dt_nom_ms = 6.0
 
 
 CORNER_WHITE_THR = 800      
-CORNER_TOTAL_THR = 3100     
+CORNER_TOTAL_THR = 2750    
 CORNER_COOLDOWN_MS = 600
 
 between_turn_ms_remaining = 0
@@ -106,7 +106,7 @@ last_between_turn_ms = 0
 gyro_kp = 140
 gyro_kd = 4
 gyro_max_speed = 1500
-
+LINE_BLACK_SENSOR_THR = 700
 
 if edition == "Standard":
     gyro_max_speed = gyro_max_speed
@@ -345,7 +345,7 @@ def gyro_turn_relative(target_angle_deg):
             turn_speed = -gyro_max_speed
 
         motors.set_speeds(-int(turn_speed), int(turn_speed))
-        time.sleep_ms(5)
+        time.sleep_ms(1)
 
     motors.off()
 
@@ -388,7 +388,7 @@ def main():
     global music_on, SONG_START_MS
 
     calibrate()
-    time.sleep_ms(500)
+    time.sleep_ms(50)
 
     last_p = 0
     p = 0
@@ -478,11 +478,25 @@ def main():
         if mode == MODE_LINE:
             
             p_raw = l - 2000
+            # Corner condition in MODE_LINE: "whenever it sees most white"
+            # if (total < CORNER_WHITE_THR and
+            #         time.ticks_diff(now_ms, last_corner_ms) > CORNER_COOLDOWN_MS):
+            has_black = (
+                line[0] > LINE_BLACK_SENSOR_THR or
+                line[1] > LINE_BLACK_SENSOR_THR or
+                line[2] > LINE_BLACK_SENSOR_THR or
+                line[3] > LINE_BLACK_SENSOR_THR or
+                line[4] > LINE_BLACK_SENSOR_THR
+            )
 
-            if (total < CORNER_WHITE_THR and
+            if (not has_black and
                     time.ticks_diff(now_ms, last_corner_ms) > CORNER_COOLDOWN_MS):
+            # if (total < CORNER_WHITE_THR and
+            #         time.ticks_diff(now_ms, last_corner_ms) > CORNER_COOLDOWN_MS):
                 motors.off()
-                time.sleep_ms(50)
+                time.sleep_ms(5)
+                # motors.set_speeds(-500, -500)
+                # time.sleep_ms(300)
                 line_corner_count += 1
                 # print("Line corner #", line_corner_count)
                 gyro_turn_relative(-90.0)  
@@ -513,7 +527,9 @@ def main():
             if (total > CORNER_TOTAL_THR and
                     time.ticks_diff(now_ms, last_corner_ms) > CORNER_COOLDOWN_MS):
                 motors.off()
-                time.sleep_ms(50)
+                time.sleep_ms(5)
+                motors.set_speeds(-500, -500)
+                time.sleep_ms(500)
                 handle_between_corner(now_ms)
                 last_corner_ms = now_ms
                
@@ -610,7 +626,7 @@ def main():
         if (now_ms % 100) < 10:
             update_display(p, selected_param, mode)
 
-        time.sleep_ms(5)
+        time.sleep_ms(1)
 
 
 main()
