@@ -87,7 +87,6 @@ last_between_turn_ms = 0
 gyro_kp = 140
 gyro_kd = 4
 gyro_max_speed = 1500
-
 # Adjust gyro params depending on edition (optional tuning)
 if edition == "Standard":
     gyro_max_speed = gyro_max_speed
