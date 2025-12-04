@@ -72,7 +72,7 @@ dt_nom_ms = 6.0
 # - MODE_LINE: "mostly white" -> low total
 # - MODE_BETWEEN: "mostly black" -> high total
 CORNER_WHITE_THR = 800      # tune via UI (MODE_LINE)
-CORNER_TOTAL_THR = 3100     # you said you reduced this (MODE_BETWEEN)
+CORNER_TOTAL_THR = 2750     # you said you reduced this (MODE_BETWEEN)
 CORNER_COOLDOWN_MS = 600
 
 between_turn_ms_remaining = 0
